@@ -31,6 +31,8 @@ For more details run the following command:
 import json
 import logging
 import warnings
+import pytz
+from datetime import datetime
 
 import torch
 from jsonargparse import ActionConfigFile, ArgumentParser, namespace_to_dict
@@ -38,6 +40,7 @@ from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import (EarlyStopping, LearningRateMonitor,
                                          ModelCheckpoint)
 from pytorch_lightning.trainer.trainer import Trainer
+from pytorch_lightning.loggers import WandbLogger
 
 from comet.models import (RankingMetric, ReferencelessRegression,
                           RegressionMetric, UnifiedMetric)
@@ -88,6 +91,16 @@ def initialize_trainer(configs) -> Trainer:
     trainer_args = namespace_to_dict(configs.trainer.init_args)
     lr_monitor = LearningRateMonitor(logging_interval="step")
     trainer_args["callbacks"] = [early_stop_callback, checkpoint_callback, lr_monitor]
+    
+    tz = pytz.timezone("Asia/Bangkok") 
+    date = datetime.now(tz).strftime("%Y-%m-%d_%H-%M-%S")
+    
+    # tensorboard_logger = TensorBoardLogger(save_dir=".", name="checkpoints", version=date)
+    wandb_logger = WandbLogger(project="cometh", name=date, offline=True)
+    # print(configs)
+    # wandb_logger.experiment.config.update(configs)
+    trainer_args["logger"] = [wandb_logger]
+    
     print("TRAINER ARGUMENTS: ")
     print(json.dumps(trainer_args, indent=4, default=lambda x: x.__dict__))
     trainer = Trainer(**trainer_args)
