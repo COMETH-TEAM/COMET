@@ -35,12 +35,13 @@ import pytz
 from datetime import datetime
 
 import torch
+import wandb
 from jsonargparse import ActionConfigFile, ArgumentParser, namespace_to_dict
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import (EarlyStopping, LearningRateMonitor,
                                          ModelCheckpoint)
 from pytorch_lightning.trainer.trainer import Trainer
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 
 from comet.models import (RankingMetric, ReferencelessRegression,
                           RegressionMetric, UnifiedMetric)
@@ -96,10 +97,26 @@ def initialize_trainer(configs) -> Trainer:
     date = datetime.now(tz).strftime("%Y-%m-%d_%H-%M-%S")
     
     # tensorboard_logger = TensorBoardLogger(save_dir=".", name="checkpoints", version=date)
-    wandb_logger = WandbLogger(project="cometh", name=date, offline=True)
-    # print(configs)
-    # wandb_logger.experiment.config.update(configs)
+    wandb_logger = WandbLogger(
+        project="cometh", 
+        name=date, 
+        version=date, 
+        checkpoint_name=date,
+        offline=True
+    )
+    
+    wandb_configs = None
+    if configs.referenceless_regression_metric is not None:
+        wandb_configs = configs.referenceless_regression_metric
+        # TODO: Move wandb configs to config file
+        wandb.init(project="cometh", name=date, mode='offline', config=wandb_configs.init_args)
+    print(f'{wandb_configs=}')
+    
+    # wandb_logger.log_hyperparams(wandb_configs.init_args)
+    # wandb_logger.experiment.config.update(wandb_configs)
+    
     trainer_args["logger"] = [wandb_logger]
+    # exit()
     
     print("TRAINER ARGUMENTS: ")
     print(json.dumps(trainer_args, indent=4, default=lambda x: x.__dict__))
