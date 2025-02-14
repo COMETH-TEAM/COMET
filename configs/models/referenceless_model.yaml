@@ -16,17 +16,15 @@ referenceless_regression_metric:
     loss: mse
     dropout: 0.1
     batch_size: 16
-    train_data: 
-      - data/1720-da.csv
-    validation_data: 
-      - data/wmt-ende-newstest2021.csv
-      - data/wmt-enru-newstest2021.csv
-      - data/wmt-zhen-newstest2021.csv
+    train_data:
+      - data/data-1736919579996/train_w_bunny.csv
+    validation_data:
+      - data/data-1736919579996/val_wo_bunny.csv
     hidden_sizes:
       - 2048
       - 1024
     activations: Tanh
-    
+
 trainer: ../trainer.yaml
 early_stopping: ../early_stopping.yaml
 model_checkpoint: ../model_checkpoint.yaml
