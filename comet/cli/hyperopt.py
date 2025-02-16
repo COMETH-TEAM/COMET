@@ -22,8 +22,15 @@ def optuna_objective(trial: optuna.trial.Trial, cfg):
     else:
         raise Exception("Model configurations missing!")
 
-    model_cfg.learning_rate = trial.suggest_float("learning_rate", 1e-6, 1e-4, log=True)
-
+    # Set the hyperparameters search space
+    model_cfg.batch_size = trial.suggest_int("batch_size", 1, 32)
+    model_cfg.encoder_learning_rate = trial.suggest_float("encoder_learning_rate", 1e-6, 5e-4, log=True)
+    model_cfg.learning_rate = trial.suggest_float("learning_rate", 1e-6, 5e-4, log=True)
+    model_cfg.dropout = trial.suggest_float("dropout", 0, 0.5)
+    # model_cfg.layerwise_decay = trial.suggest_float("layerwise_decay", 0.9, 1)
+    # model_cfg.keep_embeddings_frozen = trial.suggest_categorical("keep_embeddings_frozen", [True, False])
+    # model_cfg.nr_frozen_epochs = trial.suggest_float("nr_frozen_epochs", 0.15, 1)
+    
     trainer = initialize_trainer(cfg)
     model = initialize_model(cfg)
 
@@ -47,7 +54,7 @@ def hyperopt():
     )
 
     study = optuna.create_study(direction="maximize")
-    study.optimize(partial(optuna_objective, cfg=cfg), n_trials=10)
+    study.optimize(partial(optuna_objective, cfg=cfg), n_trials=20)
     print(study.best_params)
 
 

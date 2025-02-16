@@ -10,7 +10,7 @@ init_args:
   default_root_dir: null
   deterministic: False
   fast_dev_run: False
-  max_epochs: 1
+  max_epochs: 100
   min_epochs: 0
   max_steps: -1
   min_steps: null
