@@ -31,7 +31,9 @@ For more details run the following command:
 import json
 import logging
 import warnings
+import os
 import pytz
+import yaml
 from datetime import datetime
 
 import torch
@@ -86,17 +88,36 @@ def initialize_trainer(configs) -> Trainer:
     checkpoint_callback = ModelCheckpoint(
         **namespace_to_dict(configs.model_checkpoint.init_args)
     )
+    print(namespace_to_dict(configs.model_checkpoint.init_args))
     early_stop_callback = EarlyStopping(
         **namespace_to_dict(configs.early_stopping.init_args)
     )
     trainer_args = namespace_to_dict(configs.trainer.init_args)
     lr_monitor = LearningRateMonitor(logging_interval="step")
+    
+    print(f'{checkpoint_callback.CHECKPOINT_NAME_LAST=}')
+    
     trainer_args["callbacks"] = [early_stop_callback, checkpoint_callback, lr_monitor]
     
+    # FIXME: make it better    
     tz = pytz.timezone("Asia/Bangkok") 
+    global date
     date = datetime.now(tz).strftime("%Y-%m-%d_%H-%M-%S")
     
     # tensorboard_logger = TensorBoardLogger(save_dir=".", name="checkpoints", version=date)
+    
+    wandb_configs = None
+    if configs.referenceless_regression_metric is not None:
+        wandb_configs = configs.referenceless_regression_metric
+        # TODO: Move wandb configs to config file
+        wandb.init(
+            project="cometh", 
+            id=date,
+            name=date, 
+            config=wandb_configs.init_args,
+            mode='offline',
+        )
+    
     wandb_logger = WandbLogger(
         project="cometh", 
         name=date, 
@@ -105,18 +126,7 @@ def initialize_trainer(configs) -> Trainer:
         offline=True
     )
     
-    wandb_configs = None
-    if configs.referenceless_regression_metric is not None:
-        wandb_configs = configs.referenceless_regression_metric
-        # TODO: Move wandb configs to config file
-        wandb.init(project="cometh", name=date, mode='offline', config=wandb_configs.init_args)
-    print(f'{wandb_configs=}')
-    
-    # wandb_logger.log_hyperparams(wandb_configs.init_args)
-    # wandb_logger.experiment.config.update(wandb_configs)
-    
     trainer_args["logger"] = [wandb_logger]
-    # exit()
     
     print("TRAINER ARGUMENTS: ")
     print(json.dumps(trainer_args, indent=4, default=lambda x: x.__dict__))
@@ -134,6 +144,7 @@ def initialize_model(configs):
                 default=lambda x: x.__dict__,
             )
         )
+            
         if configs.load_from_checkpoint is not None:
             logger.info(f"Loading weights from {configs.load_from_checkpoint}.")
             model = RegressionMetric.load_from_checkpoint(
@@ -153,6 +164,12 @@ def initialize_model(configs):
                 default=lambda x: x.__dict__,
             )
         )
+        
+        # FIXME: Save to `hparams.yaml`
+        os.makedirs(f"cometh/{date}", exist_ok=True)
+        with open(f"cometh/{date}/hparams.yaml", "w") as f:
+            yaml.dump(configs.referenceless_regression_metric.init_args, f, default_flow_style=False)
+        
         if configs.load_from_checkpoint is not None:
             logger.info(f"Loading weights from {configs.load_from_checkpoint}.")
             model = ReferencelessRegression.load_from_checkpoint(

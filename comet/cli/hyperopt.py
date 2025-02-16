@@ -5,6 +5,7 @@ import warnings
 import optuna
 import wandb
 from comet.cli.train import initialize_model, initialize_trainer, read_arguments
+from comet.cli.evaluate import evaluate
 from pytorch_lightning import seed_everything
 
 
@@ -23,7 +24,7 @@ def optuna_objective(trial: optuna.trial.Trial, cfg):
         raise Exception("Model configurations missing!")
 
     # Set the hyperparameters search space
-    model_cfg.batch_size = trial.suggest_int("batch_size", 1, 32)
+    model_cfg.batch_size = trial.suggest_categorical("batch_size", [1, 8, 16, 32])
     model_cfg.encoder_learning_rate = trial.suggest_float("encoder_learning_rate", 1e-6, 5e-4, log=True)
     model_cfg.learning_rate = trial.suggest_float("learning_rate", 1e-6, 5e-4, log=True)
     model_cfg.dropout = trial.suggest_float("dropout", 0, 0.5)
@@ -35,7 +36,15 @@ def optuna_objective(trial: optuna.trial.Trial, cfg):
     model = initialize_model(cfg)
 
     trainer.fit(model)
-
+    
+    # FIXME: Evaluate the model
+    test_data = [
+        "data/data-1736919579996/test_wo_bunny_with_label.csv",
+        "data/data-1736919579996/test_bunny_with_label.csv"      
+    ]
+    
+    metrics = [evaluate(model, data) for data in test_data]
+    
     wandb.finish()
 
     return trainer.early_stopping_callback.best_score.item()
