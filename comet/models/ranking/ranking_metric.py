@@ -191,34 +191,28 @@ class RankingMetric(CometModel):
         if stage == "predict":
             src_inputs = self.encoder.prepare_sample(sample["src"])
             mt_inputs = self.encoder.prepare_sample(sample["mt"])
-            ref_inputs = self.encoder.prepare_sample(sample["ref"])
 
-            ref_inputs = {"ref_" + k: v for k, v in ref_inputs.items()}
             src_inputs = {"src_" + k: v for k, v in src_inputs.items()}
             mt_inputs = {"mt_" + k: v for k, v in mt_inputs.items()}
 
-            return {**ref_inputs, **src_inputs, **mt_inputs}
+            return {**src_inputs, **mt_inputs}
 
-        ref_inputs = self.encoder.prepare_sample(sample["ref"])
         src_inputs = self.encoder.prepare_sample(sample["src"])
         pos_inputs = self.encoder.prepare_sample(sample["pos"])
         neg_inputs = self.encoder.prepare_sample(sample["neg"])
 
-        ref_inputs = {"ref_" + k: v for k, v in ref_inputs.items()}
         src_inputs = {"src_" + k: v for k, v in src_inputs.items()}
         pos_inputs = {"pos_" + k: v for k, v in pos_inputs.items()}
         neg_inputs = {"neg_" + k: v for k, v in neg_inputs.items()}
 
-        return {**ref_inputs, **src_inputs, **pos_inputs, **neg_inputs}
+        return {**src_inputs, **pos_inputs, **neg_inputs}
 
     def forward(
         self,
         src_input_ids: torch.tensor,
-        ref_input_ids: torch.tensor,
         pos_input_ids: torch.tensor,
         neg_input_ids: torch.tensor,
         src_attention_mask: torch.tensor,
-        ref_attention_mask: torch.tensor,
         pos_attention_mask: torch.tensor,
         neg_attention_mask: torch.tensor,
         **kwargs,
@@ -241,27 +235,13 @@ class RankingMetric(CometModel):
             and  distance between anchors and negative samples.
         """
         src_sentemb = self.get_sentence_embedding(src_input_ids, src_attention_mask)
-        ref_sentemb = self.get_sentence_embedding(ref_input_ids, ref_attention_mask)
         pos_sentemb = self.get_sentence_embedding(pos_input_ids, pos_attention_mask)
         neg_sentemb = self.get_sentence_embedding(neg_input_ids, neg_attention_mask)
 
-        loss = self.loss(src_sentemb, pos_sentemb, neg_sentemb) + self.loss(
-            ref_sentemb, pos_sentemb, neg_sentemb
-        )
+        loss = self.loss(src_sentemb, pos_sentemb, neg_sentemb)
 
-        distance_src_pos = F.pairwise_distance(pos_sentemb, src_sentemb)
-        distance_ref_pos = F.pairwise_distance(pos_sentemb, ref_sentemb)
-        # Harmonic mean between anchors and the positive example
-        distance_pos = (2 * distance_src_pos * distance_ref_pos) / (
-            distance_src_pos + distance_ref_pos
-        )
-
-        # Harmonic mean between anchors and the negative example
-        distance_src_neg = F.pairwise_distance(neg_sentemb, src_sentemb)
-        distance_ref_neg = F.pairwise_distance(neg_sentemb, ref_sentemb)
-        distance_neg = (2 * distance_src_neg * distance_ref_neg) / (
-            distance_src_neg + distance_ref_neg
-        )
+        distance_pos = F.pairwise_distance(pos_sentemb, src_sentemb)
+        distance_neg = F.pairwise_distance(neg_sentemb, src_sentemb)
 
         return {
             "loss": loss,
@@ -277,11 +257,10 @@ class RankingMetric(CometModel):
             List[dict]: List with input samples in the form of a dict
         """
         df = pd.read_csv(path)
-        df = df[["src", "pos", "neg", "ref"]]
+        df = df[["src", "pos", "neg"]]
         df["src"] = df["src"].astype(str)
         df["pos"] = df["pos"].astype(str)
         df["neg"] = df["neg"].astype(str)
-        df["ref"] = df["ref"].astype(str)
         return df.to_dict("records")
 
     def read_validation_data(self, path: str) -> List[dict]:
@@ -368,22 +347,15 @@ class RankingMetric(CometModel):
             src_sentemb = self.get_sentence_embedding(
                 batch["src_input_ids"], batch["src_attention_mask"]
             )
-            ref_sentemb = self.get_sentence_embedding(
-                batch["ref_input_ids"], batch["ref_attention_mask"]
-            )
             mt_sentemb = self.get_sentence_embedding(
                 batch["mt_input_ids"], batch["mt_attention_mask"]
             )
             src_distance = F.pairwise_distance(mt_sentemb, src_sentemb)
-            ref_distance = F.pairwise_distance(mt_sentemb, ref_sentemb)
-            distances = (2 * ref_distance * src_distance) / (
-                ref_distance + src_distance
-            )
+            distances = src_distance
             return Prediction(
                 scores=torch.ones_like(distances) / (1 + distances),
                 metadata=Prediction(
                     src_scores=src_distance,
-                    ref_scores=ref_distance,
                 ),
             )
 

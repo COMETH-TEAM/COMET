@@ -187,6 +187,11 @@ def initialize_model(configs):
                 configs.ranking_metric.init_args, indent=4, default=lambda x: x.__dict__
             )
         )
+        # FIXME: Save to `hparams.yaml`
+        os.makedirs(f"cometh/{date}", exist_ok=True)
+        with open(f"cometh/{date}/hparams.yaml", "w") as f:
+            yaml.dump(configs.ranking_metric.init_args, f, default_flow_style=False)
+
         if configs.load_from_checkpoint is not None:
             logger.info(f"Loading weights from {configs.load_from_checkpoint}.")
             model = RankingMetric.load_from_checkpoint(
